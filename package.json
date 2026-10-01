@@ -1,0 +1,12 @@
+{
+  "name": "adb-wireless-gui",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local GUI for wireless ADB pairing, connecting, and app testing across multiple Android devices.",
+  "scripts": {
+    "start": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ADB Wireless Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <!-- Floating Toast Notifications -->
+    <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+    <main class="app-shell">
+      <!-- Top Navigation Header -->
+      <header class="app-header">
+        <div class="brand">
+          <div class="brand-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+              <line x1="12" y1="18" x2="12.01" y2="18"></line>
+              <path d="M9 6h6"></path>
+            </svg>
+          </div>
+          <div>
+            <div class="brand-title-wrap">
+              <h1>ADB Wireless</h1>
+              <span id="adbStatusPill" class="status-badge online"><span class="dot"></span> Online</span>
+            </div>
+            <p class="brand-subtitle">Zero-config Android wireless debugging &amp; testing</p>
+          </div>
+        </div>
+
+        <div class="header-actions">
+          <button id="refreshBtn" class="btn btn-secondary btn-icon" title="Refresh ADB Devices & Ports">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+            <span>Refresh</span>
+          </button>
+          <button id="toggleLogsBtn" class="btn btn-ghost btn-icon" title="Toggle Activity Console">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+            <span>Console</span>
+            <span id="logBadge" class="counter-badge">0</span>
+          </button>
+          <button id="restartBtn" class="btn btn-ghost-danger btn-icon" title="Restart ADB daemon">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
+            <span>Restart ADB</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Connection Hub (Primary Ways to Connect) -->
+      <section class="connect-hub-grid">
+        <!-- Hero Card: QR Code Pairing -->
+        <div class="hub-card qr-highlight-card">
+          <div class="hub-card-body">
+            <div class="hub-badge-row">
+              <span class="hub-pill">Recommended</span>
+              <span class="hub-subtext">Android 11+</span>
+            </div>
+            <h3>Pair with QR Code</h3>
+            <p>Scan screen with your phone camera. Zero typing of IP or pairing codes.</p>
+            <button id="openQrModalBtn" class="btn btn-primary btn-large btn-full">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+              <span>Scan QR Code</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Discovered on Wi-Fi (mDNS Auto-detection) -->
+        <div class="hub-card discovered-card">
+          <div class="hub-card-header">
+            <div>
+              <h3>Discovered on Wi-Fi</h3>
+              <p>Nearby devices broadcasting wireless debug</p>
+            </div>
+            <span class="pill pill-muted" id="mdnsCount">mDNS</span>
+          </div>
+          <div id="mdnsList" class="mdns-list empty">Searching local Wi-Fi for wireless devices...</div>
+        </div>
+      </section>
+
+      <!-- Collapsible Manual Connection -->
+      <section class="panel collapsible-panel">
+        <button id="manualToggleBtn" class="collapsible-header" aria-expanded="false">
+          <div class="collapsible-title">
+            <svg class="chevron-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            <span>Manual IP &amp; Port Setup</span>
+          </div>
+          <span class="pill pill-outline">Manual Setup</span>
+        </button>
+
+        <div id="manualBody" class="collapsible-body collapsed">
+          <div class="manual-columns">
+            <!-- Pair Box -->
+            <div class="manual-box">
+              <h4>1. Pair with 6-Digit Code</h4>
+              <p class="box-desc">For devices requiring initial PIN pairing</p>
+              <div class="form-group">
+                <label for="pairAddress">Pairing IP &amp; Port</label>
+                <input id="pairAddress" placeholder="e.g. 192.168.1.15:41287">
+              </div>
+              <div class="form-group">
+                <label for="pairCode">6-Digit Pairing PIN</label>
+                <input id="pairCode" inputmode="numeric" maxlength="6" placeholder="e.g. 849201">
+              </div>
+              <button id="pairBtn" class="btn btn-secondary btn-full">Pair Device</button>
+            </div>
+
+            <!-- Connect Box -->
+            <div class="manual-box">
+              <h4>2. Direct Connect</h4>
+              <p class="box-desc">For already paired phones</p>
+              <div class="form-group">
+                <label for="connectAddress">Connect IP &amp; Port</label>
+                <input id="connectAddress" placeholder="e.g. 192.168.1.15:38133">
+              </div>
+              <div class="manual-btn-row">
+                <button id="connectBtn" class="btn btn-primary btn-flex">Connect</button>
+                <button id="disconnectBtn" class="btn btn-ghost btn-flex">Disconnect</button>
+                <button id="clearDeviceFormBtn" class="btn btn-ghost" title="Clear inputs">Clear</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Connected Devices & Controls -->
+      <section class="panel main-devices-panel">
+        <div class="panel-head">
+          <div class="panel-head-title">
+            <h2>Connected Devices</h2>
+            <span id="deviceCount" class="pill pill-primary">0 devices</span>
+          </div>
+          <span class="sub-label">Active wireless &amp; USB ADB connections</span>
+        </div>
+
+        <div id="deviceList" class="device-list empty">No devices connected yet. Scan a QR code or connect above.</div>
+      </section>
+
+      <!-- Quick APK Installer Box -->
+      <section class="panel apk-panel">
+        <div class="panel-head">
+          <div class="panel-head-title">
+            <h2>Quick APK Install</h2>
+            <span class="pill pill-muted">App Deploy</span>
+          </div>
+        </div>
+        <div class="apk-form-row">
+          <div class="form-field-device">
+            <label for="selectedDevice">Target Device</label>
+            <select id="selectedDevice"></select>
+          </div>
+          <div class="form-field-path">
+            <label for="apkPath">Local APK Absolute File Path</label>
+            <input id="apkPath" placeholder="/Users/ashpatel/path/to/app-debug.apk">
+          </div>
+          <button id="installBtn" class="btn btn-secondary">Install APK</button>
+        </div>
+      </section>
+
+      <!-- Activity Console Logs (Collapsible) -->
+      <section id="outputPanel" class="panel output-panel collapsed">
+        <div class="panel-head">
+          <div class="panel-head-title">
+            <h2>Activity Console</h2>
+            <span class="pill pill-dark">Raw Logs</span>
+          </div>
+          <div class="head-actions">
+            <button id="clearOutputBtn" class="btn btn-ghost btn-small">Clear</button>
+            <button id="hideOutputBtn" class="btn btn-ghost btn-small">Close</button>
+          </div>
+        </div>
+        <pre id="output">Ready.</pre>
+      </section>
+
+      <!-- QR Code Pairing Modal -->
+      <div id="qrModal" class="modal-overlay hidden">
+        <div class="modal-card">
+          <div class="modal-header">
+            <div>
+              <p class="modal-eyebrow">Zero-Configuration</p>
+              <h3>Pair with QR Code</h3>
+            </div>
+            <button id="closeQrModalBtn" class="modal-close-btn" aria-label="Close">&times;</button>
+          </div>
+
+          <div class="modal-body">
+            <div class="qr-wrapper">
+              <div id="qrCodeContainer" class="qr-code-box"></div>
+            </div>
+
+            <div class="qr-status-box">
+              <span id="qrStatusBadge" class="status-pill waiting">Waiting for scan</span>
+              <p id="qrStatusText">Scan this QR code from your phone's Wireless debugging menu.</p>
+            </div>
+
+            <div class="qr-steps">
+              <div class="qr-step-item">
+                <span class="step-num">1</span>
+                <span>Open <strong>Settings &gt; Developer options &gt; Wireless debugging</strong></span>
+              </div>
+              <div class="qr-step-item">
+                <span class="step-num">2</span>
+                <span>Tap <strong>Pair device with QR code</strong></span>
+              </div>
+              <div class="qr-step-item">
+                <span class="step-num">3</span>
+                <span>Point your phone camera at this screen</span>
+              </div>
+            </div>
+
+            <div class="qr-manual-details">
+              <span>Session details:</span>
+              <div class="qr-backup-row">
+                <code>Service: <span id="qrServiceName">...</span></code>
+                <code>PIN: <strong id="qrPassword">...</strong></code>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button id="regenerateQrBtn" class="btn btn-ghost btn-small">Regenerate QR</button>
+            <button id="doneQrBtn" class="btn btn-secondary btn-small">Close</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>
