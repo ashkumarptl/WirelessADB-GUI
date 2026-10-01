@@ -5,6 +5,7 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$DIR"
 
 echo "Building native ADB Wireless.app..."
+rm -rf "/tmp/adb-app-build"
 mkdir -p "/tmp/adb-app-build/ADB Wireless.app/Contents/MacOS" "/tmp/adb-app-build/ADB Wireless.app/Contents/Resources"
 
 swiftc -O "$DIR/app-wrapper/main.swift" -o "/tmp/adb-app-build/ADBWireless"

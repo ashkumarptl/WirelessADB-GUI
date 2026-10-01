@@ -226,6 +226,71 @@
           </div>
         </div>
       </div>
+
+      <!-- Screenshot Preview Modal -->
+      <div id="screenshotModal" class="modal-overlay hidden">
+        <div class="modal-card modal-screenshot">
+          <div class="modal-header">
+            <div>
+              <p class="modal-eyebrow">Screen Capture</p>
+              <h3>Device Screenshot</h3>
+            </div>
+            <button id="closeScreenshotModalBtn" class="modal-close-btn" aria-label="Close">&times;</button>
+          </div>
+          <div class="modal-body text-center">
+            <div class="screenshot-box">
+              <img id="screenshotImg" alt="Screenshot" />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <a id="downloadScreenshotBtn" class="btn btn-primary btn-small" download="screenshot.png">Download PNG</a>
+            <button id="doneScreenshotBtn" class="btn btn-secondary btn-small">Close</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Send Text Input Modal -->
+      <div id="inputTextModal" class="modal-overlay hidden">
+        <div class="modal-card">
+          <div class="modal-header">
+            <div>
+              <p class="modal-eyebrow">Remote Input</p>
+              <h3>Type on Phone</h3>
+            </div>
+            <button id="closeInputTextModalBtn" class="modal-close-btn" aria-label="Close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label for="textToPhone">Text or URL to type</label>
+              <input id="textToPhone" placeholder="Type text to send to focused field..." autofocus>
+            </div>
+            <p class="box-desc">Make sure a text field or search bar is tapped/focused on your phone.</p>
+          </div>
+          <div class="modal-footer">
+            <button id="sendTextBtn" class="btn btn-primary btn-small">Type on Phone</button>
+            <button id="cancelTextBtn" class="btn btn-ghost btn-small">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Device Specs Modal -->
+      <div id="infoModal" class="modal-overlay hidden">
+        <div class="modal-card">
+          <div class="modal-header">
+            <div>
+              <p class="modal-eyebrow">Hardware &amp; System</p>
+              <h3 id="infoModalTitle">Device Info</h3>
+            </div>
+            <button id="closeInfoModalBtn" class="modal-close-btn" aria-label="Close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div id="infoContent" class="info-grid">Loading...</div>
+          </div>
+          <div class="modal-footer">
+            <button id="doneInfoBtn" class="btn btn-secondary btn-small">Close</button>
+          </div>
+        </div>
+      </div>
     </main>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>

@@ -163,12 +163,37 @@ function renderDevices() {
             </div>
           </div>
 
-          <div class="device-quick-actions">
-            <span class="quick-label">Controls:</span>
+          <!-- Primary Tools Row: Mirror, Screenshot, Battery, Specs, Type Text -->
+          <div class="device-actions-row">
+            <button class="btn btn-mirror btn-small inline-cmd" data-serial="${device.serial}" data-command="mirror" title="Mirror device screen with mouse & keyboard control">
+              🪞 Mirror Screen
+            </button>
+            <button class="btn btn-action-primary btn-small inline-cmd" data-serial="${device.serial}" data-command="screenshot" title="Capture and download screenshot">
+              📸 Screenshot
+            </button>
+            <button class="btn btn-ghost btn-small inline-cmd" data-serial="${device.serial}" data-command="battery" title="Check battery level & health">
+              🔋 Battery
+            </button>
+            <button class="btn btn-ghost btn-small inline-cmd" data-serial="${device.serial}" data-command="device_info" title="View display resolution, Android OS version & specs">
+              ℹ️ Specs
+            </button>
+            <button class="btn btn-ghost btn-small inline-cmd" data-serial="${device.serial}" data-command="input_text_prompt" title="Type text or URL into phone">
+              ⌨️ Type Text
+            </button>
+          </div>
+
+          <!-- Secondary Navigation & Power Controls -->
+          <div class="device-sub-actions">
+            <span class="quick-label">Remote:</span>
             <button class="btn btn-ghost btn-small inline-cmd" data-serial="${device.serial}" data-command="wake" title="Wake screen">⚡ Wake</button>
+            <button class="btn btn-ghost btn-small inline-cmd" data-serial="${device.serial}" data-command="power" title="Lock / Power">🔒 Lock</button>
             <button class="btn btn-ghost btn-small inline-cmd" data-serial="${device.serial}" data-command="home" title="Go Home">🏠 Home</button>
             <button class="btn btn-ghost btn-small inline-cmd" data-serial="${device.serial}" data-command="back" title="Press Back">◀ Back</button>
-            <button class="btn btn-ghost btn-small inline-cmd" data-serial="${device.serial}" data-command="packages" title="List installed packages">📋 Packages</button>
+            <button class="btn btn-ghost btn-small inline-cmd" data-serial="${device.serial}" data-command="recents" title="Recent Apps Switcher">🔲 Recents</button>
+            <button class="btn btn-ghost btn-small inline-cmd" data-serial="${device.serial}" data-command="vol_up" title="Volume Up">🔊 Vol+</button>
+            <button class="btn btn-ghost btn-small inline-cmd" data-serial="${device.serial}" data-command="vol_down" title="Volume Down">🔉 Vol-</button>
+            <button class="btn btn-ghost btn-small inline-cmd" data-serial="${device.serial}" data-command="packages" title="List 3rd-party packages">📋 Apps</button>
+            <button class="btn btn-ghost-danger btn-small inline-cmd" data-serial="${device.serial}" data-command="reboot" title="Reboot Device">🔄 Reboot</button>
           </div>
         </div>
       `;
@@ -411,13 +436,137 @@ async function disconnect(targetAddress) {
   }
 }
 
-// Device Commands (Wake, Home, Back, Packages)
+let activeInputTextSerial = null;
+
+// Modal references
+const screenshotModal = document.querySelector("#screenshotModal");
+const screenshotImg = document.querySelector("#screenshotImg");
+const downloadScreenshotBtn = document.querySelector("#downloadScreenshotBtn");
+const closeScreenshotModalBtn = document.querySelector("#closeScreenshotModalBtn");
+const doneScreenshotBtn = document.querySelector("#doneScreenshotBtn");
+
+const inputTextModal = document.querySelector("#inputTextModal");
+const textToPhone = document.querySelector("#textToPhone");
+const sendTextBtn = document.querySelector("#sendTextBtn");
+const cancelTextBtn = document.querySelector("#cancelTextBtn");
+const closeInputTextModalBtn = document.querySelector("#closeInputTextModalBtn");
+
+const infoModal = document.querySelector("#infoModal");
+const infoContent = document.querySelector("#infoContent");
+const infoModalTitle = document.querySelector("#infoModalTitle");
+const closeInfoModalBtn = document.querySelector("#closeInfoModalBtn");
+const doneInfoBtn = document.querySelector("#doneInfoBtn");
+
+// Device Commands Handler
 async function runDeviceCommand(command, targetSerial) {
   const serial = targetSerial || (selectedDevice ? selectedDevice.value : "");
   if (!serial) {
     showToast("No device selected", "error");
     return;
   }
+
+  // Handle Input Text Prompt
+  if (command === "input_text_prompt") {
+    activeInputTextSerial = serial;
+    if (textToPhone) textToPhone.value = "";
+    if (inputTextModal) inputTextModal.classList.remove("hidden");
+    if (textToPhone) setTimeout(() => textToPhone.focus(), 100);
+    return;
+  }
+
+  // Handle Mirror Screen
+  if (command === "mirror") {
+    showToast("Launching Screen Mirror (scrcpy)...", "info");
+    try {
+      const data = await request("/api/device-command", {
+        method: "POST",
+        body: JSON.stringify({ serial, command: "mirror" })
+      });
+      showToast("Screen mirror window active!", "success");
+      writeOutput("Screen Mirror", data);
+    } catch (error) {
+      const msg = error.error || error.message || "Failed to launch scrcpy";
+      showToast(msg, "error");
+      writeOutput("Mirror Failed", error);
+    }
+    return;
+  }
+
+  // Handle Screenshot
+  if (command === "screenshot") {
+    showToast("Capturing device screenshot...", "info");
+    try {
+      const data = await request("/api/device-command", {
+        method: "POST",
+        body: JSON.stringify({ serial, command: "screenshot" })
+      });
+      if (data.ok && data.image) {
+        if (screenshotImg) screenshotImg.src = data.image;
+        if (downloadScreenshotBtn) {
+          downloadScreenshotBtn.href = data.image;
+          downloadScreenshotBtn.download = `screenshot_${serial.replace(/[:.]/g, "_")}_${Date.now()}.png`;
+        }
+        if (screenshotModal) screenshotModal.classList.remove("hidden");
+        showToast("Screenshot captured!", "success");
+        writeOutput("Screenshot", `Captured ${(data.sizeBytes / 1024).toFixed(1)} KB image`);
+      }
+    } catch (error) {
+      showToast(error.error || "Failed to capture screenshot", "error");
+      writeOutput("Screenshot Failed", error);
+    }
+    return;
+  }
+
+  // Handle Battery
+  if (command === "battery") {
+    showToast("Checking battery status...", "info");
+    try {
+      const data = await request("/api/device-command", {
+        method: "POST",
+        body: JSON.stringify({ serial, command: "battery" })
+      });
+      showToast(`Battery: ${data.level} (${data.status}) · ${data.temperature} · ${data.voltage}`, "success");
+      writeOutput("Battery Status", data);
+    } catch (error) {
+      showToast("Failed to read battery", "error");
+      writeOutput("Battery Error", error);
+    }
+    return;
+  }
+
+  // Handle Device Info
+  if (command === "device_info") {
+    showToast("Loading device specifications...", "info");
+    try {
+      const data = await request("/api/device-command", {
+        method: "POST",
+        body: JSON.stringify({ serial, command: "device_info" })
+      });
+      if (infoModalTitle) infoModalTitle.textContent = `${data.brand} ${data.model} Specs`;
+      if (infoContent) {
+        infoContent.innerHTML = `
+          <div class="info-item"><span>Brand & Model</span><strong>${data.brand} ${data.model}</strong></div>
+          <div class="info-item"><span>Android Version</span><strong>Android ${data.androidVersion}</strong></div>
+          <div class="info-item"><span>Display Resolution</span><strong>${data.resolution}</strong></div>
+          <div class="info-item"><span>Screen Density</span><strong>${data.density} dpi</strong></div>
+          <div class="info-item"><span>Serial / Address</span><strong>${serial}</strong></div>
+        `;
+      }
+      if (infoModal) infoModal.classList.remove("hidden");
+      writeOutput("Device Specs", data);
+    } catch (error) {
+      showToast("Failed to read device specs", "error");
+      writeOutput("Device Specs Error", error);
+    }
+    return;
+  }
+
+  // Reboot Confirmation
+  if (command === "reboot") {
+    if (!confirm(`Are you sure you want to reboot device ${serial}?`)) return;
+  }
+
+  // Generic key/command execution
   try {
     const data = await request("/api/device-command", {
       method: "POST",
@@ -430,6 +579,52 @@ async function runDeviceCommand(command, targetSerial) {
     writeOutput(`Command failed: ${command}`, error);
   }
 }
+
+// Screenshot Modal Close
+if (closeScreenshotModalBtn) closeScreenshotModalBtn.addEventListener("click", () => screenshotModal.classList.add("hidden"));
+if (doneScreenshotBtn) doneScreenshotBtn.addEventListener("click", () => screenshotModal.classList.add("hidden"));
+if (screenshotModal) screenshotModal.addEventListener("click", (e) => { if (e.target === screenshotModal) screenshotModal.classList.add("hidden"); });
+
+// Input Text Modal Events
+if (closeInputTextModalBtn) closeInputTextModalBtn.addEventListener("click", () => inputTextModal.classList.add("hidden"));
+if (cancelTextBtn) cancelTextBtn.addEventListener("click", () => inputTextModal.classList.add("hidden"));
+if (inputTextModal) inputTextModal.addEventListener("click", (e) => { if (e.target === inputTextModal) inputTextModal.classList.add("hidden"); });
+
+if (sendTextBtn) {
+  sendTextBtn.addEventListener("click", async () => {
+    const text = textToPhone ? textToPhone.value : "";
+    if (!text) {
+      showToast("Please enter some text", "error");
+      return;
+    }
+    try {
+      await request("/api/device-command", {
+        method: "POST",
+        body: JSON.stringify({ serial: activeInputTextSerial, command: "input_text", text })
+      });
+      showToast("Text sent to phone!", "success");
+      writeOutput("Sent Text to Device", text);
+      if (inputTextModal) inputTextModal.classList.add("hidden");
+    } catch (error) {
+      showToast("Failed to send text", "error");
+      writeOutput("Send Text Failed", error);
+    }
+  });
+}
+
+if (textToPhone) {
+  textToPhone.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (sendTextBtn) sendTextBtn.click();
+    }
+  });
+}
+
+// Info Modal Close
+if (closeInfoModalBtn) closeInfoModalBtn.addEventListener("click", () => infoModal.classList.add("hidden"));
+if (doneInfoBtn) doneInfoBtn.addEventListener("click", () => infoModal.classList.add("hidden"));
+if (infoModal) infoModal.addEventListener("click", (e) => { if (e.target === infoModal) infoModal.classList.add("hidden"); });
 
 // APK Install
 if (document.querySelector("#installBtn")) {

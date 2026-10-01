@@ -1,7 +1,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const { execFile } = require("child_process");
+const { execFile, spawn } = require("child_process");
 
 const PORT = Number(process.env.PORT || 5151);
 const PUBLIC_DIR = path.join(__dirname, "public");
@@ -341,19 +341,132 @@ async function handleApi(req, res) {
         return sendJson(res, 400, { ok: false, error: "Choose a connected device first." });
       }
 
+      const serial = body.serial.trim();
+
+      // Screen Mirroring via scrcpy
+      if (body.command === "mirror") {
+        const scrcpyPaths = ["/opt/homebrew/bin/scrcpy", "/usr/local/bin/scrcpy", "scrcpy"];
+        let scrcpyBin = "scrcpy";
+        for (const p of scrcpyPaths) {
+          if (fs.existsSync(p)) {
+            scrcpyBin = p;
+            break;
+          }
+        }
+
+        try {
+          const child = spawn(scrcpyBin, ["-s", serial, "--window-title", `ADB Mirror: ${serial}`], {
+            detached: true,
+            stdio: "ignore",
+            env: { ...process.env, PATH: `/opt/homebrew/bin:/usr/local/bin:${process.env.PATH || ""}` }
+          });
+          child.unref();
+          return sendJson(res, 200, { ok: true, message: `Screen mirror opened for ${serial}` });
+        } catch (err) {
+          return sendJson(res, 500, {
+            ok: false,
+            error: `Failed to launch scrcpy: ${err.message}. Install via: brew install scrcpy`
+          });
+        }
+      }
+
+      // Real PNG Screenshot (Base64)
+      if (body.command === "screenshot") {
+        return new Promise((resolve) => {
+          execFile(
+            ADB,
+            ["-s", serial, "exec-out", "screencap", "-p"],
+            { encoding: "buffer", maxBuffer: 15 * 1024 * 1024, timeout: 15000 },
+            (error, stdout, stderr) => {
+              if (error || !stdout || stdout.length === 0) {
+                return sendJson(res, 500, {
+                  ok: false,
+                  error: (stderr ? stderr.toString() : "") || "Failed to capture screenshot."
+                });
+              }
+              const base64 = stdout.toString("base64");
+              sendJson(res, 200, {
+                ok: true,
+                image: `data:image/png;base64,${base64}`,
+                sizeBytes: stdout.length
+              });
+              resolve();
+            }
+          );
+        });
+      }
+
+      // Battery Status
+      if (body.command === "battery") {
+        const result = await runAdb(["-s", serial, "shell", "dumpsys", "battery"]);
+        if (!result.ok) {
+          return sendJson(res, 500, { ok: false, error: "Failed to get battery info." });
+        }
+        const data = {};
+        result.stdout.split(/\r?\n/).forEach((line) => {
+          const parts = line.split(":");
+          if (parts.length === 2) data[parts[0].trim()] = parts[1].trim();
+        });
+        const statusMap = { "1": "Unknown", "2": "Charging", "3": "Discharging", "4": "Not charging", "5": "Full" };
+        return sendJson(res, 200, {
+          ok: true,
+          level: data.level ? `${data.level}%` : "N/A",
+          status: statusMap[data.status] || "Discharging",
+          temperature: data.temperature ? `${(Number(data.temperature) / 10).toFixed(1)}°C` : "N/A",
+          voltage: data.voltage ? `${(Number(data.voltage) / 1000).toFixed(2)}V` : "N/A"
+        });
+      }
+
+      // Device Specs & Display Info
+      if (body.command === "device_info") {
+        const [sizeRes, densRes, verRes, modelRes, brandRes] = await Promise.all([
+          runAdb(["-s", serial, "shell", "wm", "size"]),
+          runAdb(["-s", serial, "shell", "wm", "density"]),
+          runAdb(["-s", serial, "shell", "getprop", "ro.build.version.release"]),
+          runAdb(["-s", serial, "shell", "getprop", "ro.product.model"]),
+          runAdb(["-s", serial, "shell", "getprop", "ro.product.brand"])
+        ]);
+        return sendJson(res, 200, {
+          ok: true,
+          resolution: sizeRes.stdout.replace("Physical size:", "").trim(),
+          density: densRes.stdout.replace("Physical density:", "").trim(),
+          androidVersion: verRes.stdout.trim() || "N/A",
+          model: modelRes.stdout.trim() || "N/A",
+          brand: brandRes.stdout.trim() || "N/A"
+        });
+      }
+
+      // Send Input Text to Device
+      if (body.command === "input_text") {
+        const text = String(body.text || "").trim();
+        if (!text) {
+          return sendJson(res, 400, { ok: false, error: "Enter text to type on phone." });
+        }
+        const escaped = text.replace(/ /g, "%s").replace(/([&|;()<>\$`\\])/g, "\\$1");
+        const result = await runAdb(["-s", serial, "shell", "input", "text", escaped]);
+        return sendJson(res, result.ok ? 200 : 500, result);
+      }
+
+      // Standard Key & Navigation Commands
       const commands = {
         wake: ["shell", "input", "keyevent", "KEYCODE_WAKEUP"],
+        power: ["shell", "input", "keyevent", "KEYCODE_POWER"],
         home: ["shell", "input", "keyevent", "KEYCODE_HOME"],
         back: ["shell", "input", "keyevent", "KEYCODE_BACK"],
-        screenshot: ["exec-out", "screencap", "-p"],
-        packages: ["shell", "pm", "list", "packages"]
+        recents: ["shell", "input", "keyevent", "KEYCODE_APP_SWITCH"],
+        vol_up: ["shell", "input", "keyevent", "KEYCODE_VOLUME_UP"],
+        vol_down: ["shell", "input", "keyevent", "KEYCODE_VOLUME_DOWN"],
+        mute: ["shell", "input", "keyevent", "KEYCODE_VOLUME_MUTE"],
+        packages: ["shell", "pm", "list", "packages", "-3"],
+        reboot: ["reboot"]
       };
+
       const commandArgs = commands[body.command];
       if (!commandArgs) {
         return sendJson(res, 400, { ok: false, error: "Unknown command." });
       }
 
-      const result = await runAdb(["-s", body.serial.trim(), ...commandArgs], { timeout: 30000 });
+      const result = await runAdb(["-s", serial, ...commandArgs], { timeout: 30000 });
       return sendJson(res, result.ok ? 200 : 500, result);
     }
 

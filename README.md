@@ -40,3 +40,18 @@ npm start
 3. Put the 6-digit code into `Pairing code` and click `Pair Device`.
 4. After pairing, use the normal Wireless debugging `IP address & port` as `Connect address` and click `Connect`.
 
+---
+
+## Device Controls & Features
+
+Once connected, each device card includes:
+
+- **🪞 Screen Mirroring (`scrcpy`):** Low-latency, interactive screen mirroring with full mouse & keyboard touch controls (powered by `scrcpy`).
+- **📸 Screenshot:** 1-click screen capture with preview popup & instant PNG download.
+- **🔋 Battery Info:** Real-time battery %, charging state, temperature, and voltage.
+- **ℹ️ Device Specs:** Display resolution, screen DPI, Android OS version, brand & model.
+- **⌨️ Type Text:** Send text, long strings, or URLs directly into the phone's focused input.
+- **📱 Remote Keys:** Wake, Power/Lock, Home, Back, Recent Apps, Volume (+/-), and Reboot.
+- **📦 APK Installer:** Install local `.apk` files directly to the selected device.
+
+
